@@ -64,7 +64,7 @@ Rules:
 - Each shot must have:
     - A scene description
     - 3 frames
-    - You Must generate 4 shots at least for each video. 
-- Frame code format:  {arabic_title} v{video_number}s{shot_number}f{frame_number}
+    - You Must generate 4 shots at least for each video, even if the text is not enough, generate a text from your own that matches the video purpose. 
+- Frame code format: v{video_number}s{shot_number}f{frame_number}
 Return structured output ONLY in the format required by the Pydantic model.
 """

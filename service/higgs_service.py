@@ -1,39 +1,134 @@
-import requests
 import json
+from typing import List, Optional
+from fastapi import UploadFile
+import httpx
+from openai import OpenAI
+import requests
 from core.config import Settings
+from pydantic import BaseModel
+from prompts.default_prompts import DefaultPrompts
+from repositories.agent_repo import AgentRepository
+from repositories.doc_files_repo import DocFilesRepository
+from repositories.higgs_repo import HiggsRepository
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from schema.ai_schema import AgentResponse, StoryboardOutput
 
 settings = Settings()
 
-url = "https://platform.higgsfield.ai/nano-banana-pro"
+class HiggsService:
+    def __init__(self,
+                 db: AsyncSession,
+                 higgs_repo: HiggsRepository,
+                 agent_repo: AgentRepository,
+                 ):
+        self.db = db
+        self.higgs_repo = higgs_repo
+        self.agent_repo = agent_repo
+        self.higgs_base_url = "https://platform.higgsfield.ai"
 
-headers = {
-    "Content-Type": "application/json",
-    "hf-api-key": settings.HF_API_KEY,
-    "hf-secret": settings.HF_API_SECRET
-}
+    async def send_higgs_request(self, 
+                                prompt: dict | str,
+                                num_images: int = 1,
+                                resolution: str = "2k",
+                                aspect_ratio: str = "16:9",
+                                output_format: str = "png",
+                                end_point: str = "/text-to-image"):
 
-data = {
-    "num_images": 1,
-    "resolution": "2k",
-    "aspect_ratio": "4:3",
-    "output_format": "png",
-    "prompt": """{
-              "style": "Ultra-realistic 8K, cinematic, with enhanced material micro-details and lifelike depth of field",
-              "camera_lens": "35mm lens",
-              "environment": "Well-organized industrial chemical storage room with metal shelving, labeled plastic and metal containers of cleaning and disinfecting products, safety signage on the walls, and a clean epoxy floor",
-              "characters": "Arab male worker in full PPE including reflective safety vest, white hard helmet, protective nitrile gloves, and safety shoes, standing near a shelf while holding two different cleaning product bottles and looking at them thoughtfully",
-              "scene": "The worker stands between tall shelves, hesitating as he compares two different chemical containers, suggesting he is about to mix them without understanding the risks, with hazard pictograms visible on the labels",
-              "camera": "Horizontal 16:9 composition, eye-level perspective with a slight three-quarter angle, shallow depth of field focusing on the worker and containers, background shelves softly blurred",
-              "lighting": "Soft but directional overhead industrial lighting with natural-looking reflections on plastic and metal surfaces, deep contrast and crisp shadows that emphasize labels and hazard symbols",
-              "details": "Extremely detailed textures on plastic containers, realistic printed labels with small text and hazard icons, subtle wear on shelving paint, accurate reflections on glossy surfaces, realistic fabric weave on the reflective vest, visible skin texture on the worker’s face, natural creases in PPE clothing, and faint dust particles in the air",
-              "extra_details": "Overall mood conveys subtle tension and educational focus on chemical safety, with consistent color palette and environment to match later scenes of chemical reactions and accidents"
-            }"""
-}
+        headers = {
+            "Content-Type": "application/json",
+            "hf-api-key": settings.HF_API_KEY,
+            "hf-secret": settings.HF_API_SECRET
+        }
 
-response = requests.post(url, headers=headers, data=json.dumps(data))
+        data = {
+            "num_images": num_images,
+            "resolution": resolution,
+            "aspect_ratio": aspect_ratio,
+            "output_format": output_format,
+            "prompt": str(prompt)
+        }
+        response = requests.post(self.higgs_base_url+"/nano-banana-pro", headers=headers, data=json.dumps(data))
 
-if response.status_code == 200:
-    result = response.json()
-    print("Success:", result)
-else:
-    print("Error:", response.status_code, response.text)
+        if response.status_code == 200:
+            result = response.json()
+            print("Success:", result)
+        else:
+            print("Error:", response.status_code, response.text)
+        return response.json()
+
+    async def generate_images_for_file(self, file_id: str, video_number: Optional[int] = None):
+        # Get prompts from DB (still dict inside prompt field)
+        prompts: List[AgentResponse] = await self.agent_repo.get_prompts_by_file_id(
+            file_id=file_id,
+            video_number=video_number
+        )
+        
+        higgs_prompts = []
+
+        for prompt in prompts:
+            # Convert the dict into Pydantic StoryboardOutput
+            storyboard: StoryboardOutput = StoryboardOutput.model_validate(prompt.prompt)
+
+            for shot in storyboard.shots:
+                for frame in shot.frames:
+                    # Convert frame_prompt to dict to send to Higgs
+                    higgs_prompts.append(frame.frame_prompt.model_dump())
+
+                    higgs_req = await self.send_higgs_request(prompt= frame.frame_prompt.model_dump())
+
+                    await self.higgs_repo.create({"prompt": str(frame.frame_prompt.model_dump()),
+                                                    "file_name": prompt.filename,
+                                                    "video_number": storyboard.video_number,
+                                                    "shot_number": shot.shot_number,
+                                                    "frame_number": frame.frame_number,
+                                                    "status_url": higgs_req['status_url'],
+                                                    "cancel_url": higgs_req['cancel_url'],
+                                                    "status": higgs_req['status'],
+                                                    "request_body": None,
+                                                    "response_body": higgs_req
+                                                    })
+                    await self.db.commit()
+        
+        print(higgs_prompts)
+        return higgs_prompts
+
+
+
+    async def generate_kling_video(
+        self,
+        image_url: str,
+        last_image_url: str | None = None,
+        prompt: str | None = ""
+    ):
+        url = f"{self.higgs_base_url}/kling-video/v2.5-turbo/pro/image-to-video"
+
+        if prompt is None:
+            prompt = ""
+
+        payload = {
+            "prompt": prompt,
+            "duration": 5,
+            "cfg_scale": 0.5,
+            "image_url": image_url,
+            "last_image_url": last_image_url or "",
+            "negative_prompt": ""
+        }
+
+        headers = {
+            "Content-Type": "application/json",
+            "hf-api-key": settings.HF_API_KEY,
+            "hf-secret": settings.HF_API_SECRET
+        }
+
+        async with httpx.AsyncClient(timeout=60) as client:
+            try:
+                response = await client.post(url, json=payload, headers=headers)
+                response.raise_for_status()
+                data = response.json()
+                print("Higgsfield response:", data)
+                return data
+            except httpx.HTTPStatusError as e:
+                print("Request payload:", payload)
+                print("Response text:", e.response.text)
+                raise
