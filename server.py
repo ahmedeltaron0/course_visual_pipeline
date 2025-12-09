@@ -1,15 +1,18 @@
 import re
 from io import BytesIO
-from typing import List, Dict
+from typing import List, Dict, Optional
+import uuid
 
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import Depends, FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from docx import Document
 import urllib.parse
 
+from core.container import get_agent_service, get_higgs_service
 from schema.ai_schema import StoryboardOutput
-from service.ai_service import poke_agent
+from service.ai_service import AgentService
+from service.higgs_service import HiggsService
 
 app = FastAPI()
 
@@ -121,16 +124,37 @@ async def extract_text(file: UploadFile) -> StreamingResponse:
 
 
 
-@app.post("/extract-script-txt")
-async def extract_script_txt(file: UploadFile = File(...)):
+@app.post("/generate_file_prompts")
+async def generate_file_prompts(file: UploadFile = File(...),
+                             agent_service: AgentService = Depends(get_agent_service),
+                             ):
     if not file.filename.lower().endswith(".docx"):
         raise HTTPException(status_code=400, detail="Please upload a .docx file")
-    try:
-        results = await extract_text(file) 
-        videos_prompts = []
-        for result in results:
-            videos_prompts.append(poke_agent(result, StoryboardOutput))
-        return videos_prompts
+    results = await extract_text(file) 
 
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    videos_prompts = await agent_service.poke_agent(messages= results,
+                                    structured_output_format=StoryboardOutput,
+                                    file = file)
+    return videos_prompts
+
+@app.post("/generate_images_for_file")
+async def generate_images_for_file(file_id: uuid.UUID,
+                                   video_number: Optional[int] = None,
+                                    higgs_service: HiggsService = Depends(get_higgs_service),
+                                    ):
+
+    result = await higgs_service.generate_images_for_file(file_id=file_id, video_number=video_number)
+    return result
+
+@app.post("/generate_videos_from_images")
+async def generate_images_for_file( image_url_1: str,
+                                    image_url_2: str | None = None,
+                                    prompt: str | None = None,
+                                    higgs_service: HiggsService = Depends(get_higgs_service),
+                                    ):
+
+    result = await higgs_service.generate_kling_video(image_url=image_url_1,
+                                                      last_image_url=image_url_2,
+                                                      prompt=prompt)
+    return result
+

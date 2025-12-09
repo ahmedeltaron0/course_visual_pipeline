@@ -1,6 +1,6 @@
-from pydantic import BaseModel
+import uuid
 from typing import List
-
+from datetime import datetime
 from pydantic import BaseModel, Field
 
 class FramePrompt(BaseModel):
@@ -28,3 +28,11 @@ class Shot(BaseModel):
 class StoryboardOutput(BaseModel):
     video_number: int
     shots: List[Shot]
+
+class AgentResponse(BaseModel):
+    id: uuid.UUID
+    filename: str
+    file_id: uuid.UUID
+    video_number: int
+    prompt: StoryboardOutput
+    created_at: datetime

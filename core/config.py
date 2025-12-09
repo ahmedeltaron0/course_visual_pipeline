@@ -7,9 +7,12 @@ class Settings(BaseSettings):
     OPENAI_MODEL: str = Field(..., env="OPENAI_MODEL")
     HF_API_KEY : str = Field(..., env="HF_API_KEY")
     HF_API_SECRET: str = Field(..., env="HF_API_SECRET")
+    DATABASE_URL : str = Field(..., env="DATABASE_URL")
 
 
     class Config:
         # Automatically read from .env file
         env_file = ".env"
         env_file_encoding = "utf-8"
+
+settings = Settings()
