@@ -26,7 +26,7 @@ Rules:
    - Use photorealistic rendering quality
 
 3. If a frame includes a worker, technician, engineer, inspector, or any human presence:
-   - The person must have Arab / Middle Eastern facial features
+   - The person must have Middle Eastern facial features
    - The person must wear full PPE:
        • reflective safety vest
        • hard helmet

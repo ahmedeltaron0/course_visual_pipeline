@@ -1,7 +1,6 @@
 from pydantic import Field
 from pydantic_settings import BaseSettings
 
-
 class Settings(BaseSettings):
     OPENAI_API_KEY : str = Field(..., env="OPENAI_API_KEY")
     OPENAI_MODEL: str = Field(..., env="OPENAI_MODEL")

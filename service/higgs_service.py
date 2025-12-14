@@ -1,5 +1,5 @@
 import json
-from typing import List, Optional
+from typing import List, Optional, Union
 from fastapi import UploadFile
 import httpx
 from openai import OpenAI
@@ -28,7 +28,7 @@ class HiggsService:
         self.higgs_base_url = "https://platform.higgsfield.ai"
 
     async def send_higgs_request(self, 
-                                prompt: dict | str,
+                                prompt: Union[dict, str],
                                 num_images: int = 1,
                                 resolution: str = "2k",
                                 aspect_ratio: str = "16:9",
@@ -98,8 +98,8 @@ class HiggsService:
     async def generate_kling_video(
         self,
         image_url: str,
-        last_image_url: str | None = None,
-        prompt: str | None = ""
+        last_image_url: Optional[str] = None,
+        prompt: Optional[str] = ""
     ):
         url = f"{self.higgs_base_url}/kling-video/v2.5-turbo/pro/image-to-video"
 

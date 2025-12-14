@@ -148,8 +148,8 @@ async def generate_images_for_file(file_id: uuid.UUID,
 
 @app.post("/generate_videos_from_images")
 async def generate_images_for_file( image_url_1: str,
-                                    image_url_2: str | None = None,
-                                    prompt: str | None = None,
+                                    image_url_2: Optional[str] = None,
+                                    prompt: Optional[str] = None,
                                     higgs_service: HiggsService = Depends(get_higgs_service),
                                     ):
 
