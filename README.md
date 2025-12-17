@@ -4,13 +4,13 @@ A FastAPI-based backend pipeline designed to automate the creation of visual ass
 
 ## Features
 
-- [x] **Script Extraction**: Automatically parses Arabic `.docx` course scripts to identify and extract video sections (e.g., "الفيديو الأول", "الفيديو الثاني").
-- [ ] **AI Prompt Generation**: Automates the conversion of extracted scripts into detailed visual prompts/storyboards via an AI Agent. *(Pending: `ai_service.py`)*
-- [ ] **Image Generation**: Integrates with Higgs Service to generate images based on prompts. *(Pending: Integration logic in `image_generation_service.py`)*
-- [ ] **Video Generation**: Creates video clips from start/end images using Kling AI (via Higgs Service). *(Pending: `higgs_service.py`)*
-- [x] **Asynchronous Processing**: Uses `asyncio` for non-blocking I/O operations.
-- [x] **Database Integration**: Built with SQLAlchemy (Async) and PostgreSQL for robust data management of files, prompts, and generation jobs.
-- [x] **Structured Data**: Uses Pydantic schemas for strict request/response validation.
+- **Script Extraction**: Automatically parses Arabic `.docx` course scripts to identify and extract video sections (e.g., "الفيديو الأول", "الفيديو الثاني").
+- **AI Prompt Generation**: Automates the conversion of extracted scripts into detailed visual prompts/storyboards via an AI Agent. *(Pending: `ai_service.py`)*
+- **Image Generation**: Integrates with Higgs Service to generate images based on prompts. *(Pending: Integration logic in `image_generation_service.py`)*
+- **Video Generation**: Creates video clips from start/end images using Kling AI (via Higgs Service). *(Pending: `higgs_service.py`)*
+- **Asynchronous Processing**: Uses `asyncio` for non-blocking I/O operations.
+- **Database Integration**: Built with SQLAlchemy (Async) and PostgreSQL for robust data management of files, prompts, and generation jobs.
+- **Structured Data**: Uses Pydantic schemas for strict request/response validation.
 
 ## Project Structure
 
