@@ -33,7 +33,7 @@ course_visual_pipeline/
 ## Prerequisites
 
 - Python 3.9+
-- PostgreSQL Database
+- PostgreSQL Database (Supabase)
 - API Keys for:
     - OpenAI (or compatible LLM provider)
     - Higgs / Kling AI Service
