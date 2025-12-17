@@ -1,12 +1,23 @@
 import uuid
 
-# Temporary in-memory store (will be replaced by DB later)
-GENERATION_STATUS_STORE = {}
+from app.db.database import SessionLocal
+from app.repo.generation_repo import GenerationRepository
 
 
-def set_generation_status(video_id: uuid.UUID, status: str) -> None:
-    GENERATION_STATUS_STORE[str(video_id)] = status
+async def get_generation_status(video_id: uuid.UUID) -> str:
+    """
+    Get the current status of a generation job by video_id.
+    """
+    db = SessionLocal()
+    try:
+        repo = GenerationRepository(db)
 
+        job = await repo.get_by_video_id(video_id)
 
-def get_generation_status(video_id: uuid.UUID) -> str:
-    return GENERATION_STATUS_STORE.get(str(video_id), "unknown")
+        if not job:
+            return "unknown"
+
+        return job.status
+
+    finally:
+        await db.close()
