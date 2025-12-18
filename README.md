@@ -4,33 +4,36 @@ A FastAPI-based backend pipeline designed to automate the creation of visual ass
 
 ## Features
 
-- **Script Extraction**: automatically parses Arabic `.docx` course scripts to identify and extract video sections (e.g., "الفيديو الأول", "الفيديو الثاني").
-- **AI Prompt Generation**: Uses an AI agent to convert extracted scripts into detailed visual prompts/storyboards.
+- **Script Extraction**: Automatically parses Arabic `.docx` course scripts to identify and extract video sections (e.g., "الفيديو الأول", "الفيديو الثاني").
+- **AI Prompt Generation**: Automates the conversion of extracted scripts into detailed visual prompts/storyboards via an AI Agent.
 - **Image Generation**: Integrates with Higgs Service to generate images based on prompts.
-- **Video Generation**: Creates video clips from images using Kling AI (via Higgs Service).
-- **Database Integration**: SQLAlchemy & Pydantic models for managing file and generation states.
+- **Video Generation**: Creates video clips from start/end images using Kling AI (via Higgs Service).
+- **Asynchronous Processing**: Uses `asyncio` for non-blocking I/O operations.
+- **Database Integration**: Built with SQLAlchemy (Async) and PostgreSQL for robust data management of files, prompts, and generation jobs.
+- **Structured Data**: Uses Pydantic schemas for strict request/response validation.
 
 ## Project Structure
 
 ```
 course_visual_pipeline/
-├── core/               # Core configuration and dependency injection container
-├── exceptions/         # Custom exception handlers
-├── models/             # Database models (SQLAlchemy)
-├── prompts/            # AI System prompts
-├── repositories/       # Database access layer
-├── schema/             # Pydantic data schemas
-├── scripts/            # Utility scripts
-├── service/            # Business logic (AI Service, Higgs Service)
-├── server.py           # Main FastAPI application entry point
-├── requirements.txt    # Python dependencies
-└── .env                # Environment variables (not included in repo)
+├── app/
+│   ├── config/         # Configuration (Environment variables, Container)
+│   ├── db/             # Database connection & Session management
+│   ├── models/         # SQLAlchemy ORM Models (Files, Prompts, Jobs)
+│   ├── repo/           # Repository Pattern implementations
+│   ├── routers/        # FastAPI Routes (Files, Prompts, Generation)
+│   ├── schema/         # Pydantic Schemas (Input/Output validation)
+│   ├── service/        # Business Logic (File parsing, AI integration)
+│   └── main.py         # Application Entry Point
+├── .env                # Environment Variables (Not verified in git)
+├── requirements.txt    # Project Dependencies
+└── README.md           # Project Documentation
 ```
 
 ## Prerequisites
 
 - Python 3.9+
-- PostgreSQL
+- PostgreSQL Database
 - API Keys for:
     - OpenAI (or compatible LLM provider)
     - Higgs / Kling AI Service
@@ -58,13 +61,18 @@ course_visual_pipeline/
     ```
 
 4.  **Environment Configuration**:
-    Create a `.env` file in the root directory and add configuration variables (refer to `core/config.py` for required fields, typically including DB credentials and API keys).
+    Create a `.env` file in the root directory and add the following configuration variables:
+    ```ini
+    DATABASE_URL=postgresql+asyncpg://user:password@localhost:5432/dbname
+    OPENAI_API_KEY=your_openai_key
+    HIGGS_API_KEY=your_higgs_key
+    ```
 
 ## Usage
 
 1.  **Start the Server**:
     ```bash
-    uvicorn server:app --reload
+    uvicorn app.main:app --reload
     ```
     The API will be available at `http://localhost:8000`.
 
@@ -73,11 +81,32 @@ course_visual_pipeline/
 
 ### Key Endpoints
 
--   `POST /generate_file_prompts`: Upload a `.docx` file to extract text and generate storyboard prompts.
--   `POST /generate_images_for_file`: Trigger image generation for a specific file or video section.
--   `POST /generate_videos_from_images`: Generate a video from a start image (and optional end image) using a prompt.
+#### 1. File Extraction
+- **POST** `/files/extract`
+- Upload a `.docx` file to parse and save video scripts to the database.
+
+#### 2. Prompt Generation
+- **POST** `/prompts/generate`
+- Generate AI storyboards/prompts for the extracted video scripts.
+
+#### 3. Image Generation
+- **POST** `/generation/images`
+- Trigger image generation from a specific prompt.
+
+#### 4. Video Generation
+- **POST** `/generation/video`
+- Generate a video using a start image (and optional end image).
+
+#### 5. Status Check
+- **GET** `/generation/status/{video_id}`
+- Check the progress of a background generation job.
 
 ## Development
 
--   **Database**: Uses `asyncpg` and `sqlalchemy`. Ensure your database migration/setup is complete before running.
--   **Services**: `AgentService` handles LLM interactions, while `HiggsService` handles media generation.
+- **Database Migrations**: Ensure your PostgreSQL database is running and accessible via `DATABASE_URL` before starting the app. The app attempts to create tables on startup (dev mode).
+- **Architecture**: The project follows a layered architecture: `Router -> Service -> Repository -> Database`.
+
+## Troubleshooting
+
+- **"ModuleNotFoundError"**: Ensure you are running the command from the root directory and your virtual environment is active.
+- **Database Connection**: Verify `DATABASE_URL` in `.env` matches your local PostgreSQL credentials.
