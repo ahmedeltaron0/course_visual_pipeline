@@ -47,10 +47,26 @@ ARABIC_ORDINALS = {
 # 2) تحويل docx إلى نص
 # ----------------------------------------
 
+from pypdf import PdfReader
+
+# ... (existing imports)
+
+# ----------------------------------------
+# 2) تحويل docx/pdf إلى نص
+# ----------------------------------------
+
 def docx_to_text(file_obj) -> str:
     document = Document(file_obj)
     paragraphs = [p.text for p in document.paragraphs]
     return "\n".join(paragraphs)
+
+def pdf_to_text(file_obj) -> str:
+    reader = PdfReader(file_obj)
+    text = ""
+    for page in reader.pages:
+        text += page.extract_text() + "\n"
+    return text
+
 
 # ----------------------------------------
 # 3) استخراج مقاطع الفيديو بدعم (الفيديو الأول)
@@ -98,12 +114,22 @@ def extract_videos_sections(full_text: str) -> List[Dict]:
     return sections
 
 # ----------------------------------------
-# 4) Endpoint: .docx → .txt (فيديوهات فقط)
+# 4) Endpoint: .docx/.pdf → .txt (فيديوهات فقط)
 # ----------------------------------------
-async def extract_text(file: UploadFile) -> StreamingResponse:
+async def extract_text(file: UploadFile) -> List[Dict]:
     try:
         contents = await file.read()
-        full_text = docx_to_text(BytesIO(contents))
+        file_obj = BytesIO(contents)
+        
+        if file.filename.lower().endswith(".docx"):
+            full_text = docx_to_text(file_obj)
+        elif file.filename.lower().endswith(".pdf"):
+            full_text = pdf_to_text(file_obj)
+        else:
+             raise HTTPException(status_code=400, detail="Unsupported file format. Please upload .docx or .pdf")
+
+        print(f"DEBUG: Extracted text length: {len(full_text)}")
+        print(f"DEBUG: First 500 chars start:\n{full_text[:500]}\nDEBUG: First 500 chars end")
 
         # 0) قص أي شيء بعد Story Board
         marker = "Story Board"
@@ -128,8 +154,8 @@ async def extract_text(file: UploadFile) -> StreamingResponse:
 async def generate_file_prompts(file: UploadFile = File(...),
                              agent_service: AgentService = Depends(get_agent_service),
                              ):
-    if not file.filename.lower().endswith(".docx"):
-        raise HTTPException(status_code=400, detail="Please upload a .docx file")
+    if not (file.filename.lower().endswith(".docx") or file.filename.lower().endswith(".pdf")):
+        raise HTTPException(status_code=400, detail="Please upload a .docx or .pdf file")
     results = await extract_text(file) 
 
     videos_prompts = await agent_service.poke_agent(messages= results,

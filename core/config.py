@@ -13,5 +13,6 @@ class Settings(BaseSettings):
         # Automatically read from .env file
         env_file = ".env"
         env_file_encoding = "utf-8"
+        extra = "allow"  # Allow extra fields from .env
 
 settings = Settings()
