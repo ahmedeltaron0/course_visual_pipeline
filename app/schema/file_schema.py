@@ -1,12 +1,24 @@
 from pydantic import BaseModel
-from typing import List
+from typing import List, Dict, Any
 
 
-class VideoSectionSchema(BaseModel):
+class FrameSchema(BaseModel):
+    frame_number: int
+    frame_code: str
+    frame_prompt: Dict[str, Any]
+
+
+class ShotSchema(BaseModel):
+    shot_number: int
+    scene: str
+    frames: List[FrameSchema]
+
+
+class VideoSchema(BaseModel):
     video_number: int
-    ordinal: str
-    raw_section_text: str
+    shots: List[ShotSchema]
 
 
 class FileExtractResponseSchema(BaseModel):
-    videos: List[VideoSectionSchema]
+    result: str
+    data: List[VideoSchema]

@@ -1,17 +1,30 @@
-from fastapi import APIRouter, UploadFile, File, Depends
-from typing import List
+from fastapi import APIRouter, Depends
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.db.database import get_db
+from app.schema.prompt_schema import (
+    GeneratePromptRequestSchema,
+    GeneratePromptResponseSchema,
+)
 from app.service.prompt_service import generate_prompts_service
-from app.config.container import get_agent_service
-from app.service.ai_service import AgentService
-from app.schema.prompt_schema import PromptResponseSchema
 
-router = APIRouter(prefix="/prompts", tags=["Prompts"])
+router = APIRouter(
+    prefix="/prompts",
+    tags=["Prompts"],
+)
 
 
-@router.post("/generate", response_model=List[PromptResponseSchema])
+@router.post(
+    "/generate",
+    response_model=GeneratePromptResponseSchema,
+)
 async def generate_prompts(
-    file: UploadFile = File(...),
-    agent: AgentService = Depends(get_agent_service)
+    payload: GeneratePromptRequestSchema,
+    db: AsyncSession = Depends(get_db),
 ):
-    return await generate_prompts_service(file, agent)
+    return await generate_prompts_service(
+        db=db,
+        file_id=payload.file_id,
+        video_number=payload.video_number,
+        num_of_shots=payload.num_of_shots,
+    )

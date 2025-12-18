@@ -1,19 +1,28 @@
 from pydantic import BaseModel
 from typing import List
 import uuid
-from datetime import datetime
-
-from app.schema.ai_schema import StoryboardOutput
 
 
-class PromptResponseSchema(BaseModel):
-    """
-    Response schema for prompt generation endpoint.
-    """
-
-    id: uuid.UUID
-    filename: str
+class GeneratePromptRequestSchema(BaseModel):
     file_id: uuid.UUID
     video_number: int
-    prompt: StoryboardOutput
-    created_at: datetime
+    num_of_shots: int
+
+
+class FramePromptSchema(BaseModel):
+    frame_number: int
+    frame_code: str
+    prompt: str
+
+
+class ShotPromptSchema(BaseModel):
+    shot_number: int
+    scene: str
+    frames: List[FramePromptSchema]
+
+
+class GeneratePromptResponseSchema(BaseModel):
+    result: str
+    file_id: uuid.UUID
+    video_number: int
+    shots: List[ShotPromptSchema]
