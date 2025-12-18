@@ -1,112 +1,86 @@
-# Course Visual Pipeline
+# Technical Overview & Architecture
 
-A FastAPI-based backend pipeline designed to automate the creation of visual assets for courses. It extracts video scripts from Word documents (`.docx`), generates storyboard prompts using AI, and produces images and videos using external generative AI services (Higgs/Kling).
+## 1. Project Concept
+The **Course Visual Pipeline** is an automated backend system designed to transform text-based course scripts into visual video content. It acts as an intelligent bridge between raw documents and generative AI video engines.
 
-## Features
+**Core Goal:** To minimize manual effort in video production by automating the "Script -> Storyboard -> Prompt -> Video" lifecycle.
 
-- **Script Extraction**: Automatically parses Arabic `.docx` course scripts to identify and extract video sections (e.g., "الفيديو الأول", "الفيديو الثاني").
-- **AI Prompt Generation**: Automates the conversion of extracted scripts into detailed visual prompts/storyboards via an AI Agent.
-- **Image Generation**: Integrates with Higgs Service to generate images based on prompts.
-- **Video Generation**: Creates video clips from start/end images using Kling AI (via Higgs Service).
-- **Asynchronous Processing**: Uses `asyncio` for non-blocking I/O operations.
-- **Database Integration**: Built with SQLAlchemy (Async) and PostgreSQL for robust data management of files, prompts, and generation jobs.
-- **Structured Data**: Uses Pydantic schemas for strict request/response validation.
+## 2. Core Entities (Data Model)
+The system is built around a few specific entities that represent the lifecycle of a video creation job.
 
-## Project Structure
+| Entity | Description | Storage |
+| :--- | :--- | :--- |
+| **File** | Represents the uploaded source document (e.g., `course_script.docx`). | `files` table (PostgreSQL) |
+| **Video Section** | A logical segment of the course text (e.g., "Video 1"). Parsed from the file. | *Currently Transient (in-memory)* |
+| **Storyboard** | A structured JSON plan of shots and frames for a specific video. | *Currently Transient (in-memory/API response)* |
+| **Prompt** | The refined, AI-generated descriptive text used to generate images. | `prompts` table |
+| **Generation Job** | Tracks the status of an asynchronous image/video generation task. | `generation_jobs` table |
 
-```
-course_visual_pipeline/
-├── app/
-│   ├── config/         # Configuration (Environment variables, Container)
-│   ├── db/             # Database connection & Session management
-│   ├── models/         # SQLAlchemy ORM Models (Files, Prompts, Jobs)
-│   ├── repo/           # Repository Pattern implementations
-│   ├── routers/        # FastAPI Routes (Files, Prompts, Generation)
-│   ├── schema/         # Pydantic Schemas (Input/Output validation)
-│   ├── service/        # Business Logic (File parsing, AI integration)
-│   └── main.py         # Application Entry Point
-├── .env                # Environment Variables (Not verified in git)
-├── requirements.txt    # Project Dependencies
-└── README.md           # Project Documentation
-```
+## 3. Detailed Workflow
 
-## Prerequisites
+The pipeline operates in four distinct stages:
 
-- Python 3.9+
-- PostgreSQL Database
-- API Keys for:
-    - OpenAI (or compatible LLM provider)
-    - Higgs / Kling AI Service
+### Stage A: Ingestion & Segmentation
+**Endpoint:** `POST /files/extract`
+1.  **Parsing**: The system reads the `.docx` file and extracts raw text.
+2.  **Logic**: Regex patterns identify headers like "الفيديو الأول" (First Video) to split the text into logical `Video` units.
+3.  **Storyboard Construction**: A deterministic algorithm breaks each video into `Shots` (4 per video) and `Frames` (3 per shot).
+4.  **Output**: Returns a JSON object representing the `Storyboard` structure.
+5.  **Tested**: ✅
 
-## Installation
+### Stage B: Prompt Refinement (AI Agent)
+**Endpoint:** `POST /prompts/generate`
+1.  **Input**: Receives `file_id` and `video_number`.
+2.  **Retrieval**: *Intended* to fetch the storyboard context (Note: Currently requires data persistence adjustment to work fully).
+3.  **AI Processing**: Sends the scene descriptions to OpenAI.
+4.  **Transformation**: The AI converts simple scene descriptions into professional, "ultra-realistic" image generation prompts (e.g., specifying camera lens, lighting, style).
+5.  **Persistence**: Saves the generated prompts to the `prompts` table.
+6.  **Tested**: ✅
 
-1.  **Clone the repository**:
-    ```bash
-    git clone <repository_url>
-    cd course_visual_pipeline
-    ```
+### Stage C: Image Generation
+**Endpoint:** `POST /generation/images`
+1.  **Trigger**: User requests images for a specific Prompt ID.
+2.  **Job Creation**: Creates a `GenerationJob` record with status `pending`.
+3.  **Execution**: *Planned* to trigger the Higgs API to generate the actual image assets.
+4.  **Tested**: Not Yet
 
-2.  **Create and activate a virtual environment**:
-    ```bash
-    python -m venv venv
-    # Windows
-    venv\Scripts\activate
-    # Linux/Mac
-    source venv/bin/activate
-    ```
+### Stage D: Video Generation
+**Endpoint:** `POST /generation/video`
+1.  **Input**: Start Image URL + (Optional) End Image URL + Prompt.
+2.  **Execution**: Calls the Kling AI video model (via Higgs service) to animate the images.
+3.  **Tested**: Not Yet
 
-3.  **Install dependencies**:
-    ```bash
-    pip install -r requirements.txt
-    ```
+## 4. Component Architecture
+The application follows a strict **Layered Architecture** to ensure separation of concerns:
 
-4.  **Environment Configuration**:
-    Create a `.env` file in the root directory and add the following configuration variables:
-    ```ini
-    DATABASE_URL=postgresql+asyncpg://user:password@localhost:5432/dbname
-    OPENAI_API_KEY=your_openai_key
-    HIGGS_API_KEY=your_higgs_key
-    ```
+-   **Routers (`app/routers`)**:
+    -   Handle HTTP Request/Response.
+    -   Validate input using Pydantic Schemas (`app/schema`).
+    -   Delegate work to Services.
 
-## Usage
+-   **Services (`app/service`)**:
+    -   Contain the core Business Logic.
+    -   Coordinate between Repositories and External APIs (OpenAI, Higgs).
+    -   *Example*: `prompt_service.py` manages the conversation with OpenAI.
 
-1.  **Start the Server**:
-    ```bash
-    uvicorn app.main:app --reload
-    ```
-    The API will be available at `http://localhost:8000`.
+-   **Repositories (`app/repo`)**:
+    -   Abstract the Database interactions.
+    -   Perform CRUD operations using SQLAlchemy models.
+    -   *Example*: `FileRepository` handles specific queries for `File` records.
 
-2.  **API Documentation**:
-    Visit `http://localhost:8000/docs` to view the interactive Swagger UI.
+-   **Models (`app/models`)**:
+    -   Define the Database Schema mapping (ORM).
 
-### Key Endpoints
+## 5. Technology Stack
+-   **Runtime**: Python 3.9+
+-   **Web Framework**: FastAPI (High performance, Async).
+-   **Database**: PostgreSQL with `asyncpg` driver.
+-   **ORM**: SQLAlchemy (Async).
+-   **Validation**: Pydantic.
+-   **AI Integration**: OpenAI SDK (LLM), HTTP Client (Media Gen).
 
-#### 1. File Extraction
-- **POST** `/files/extract`
-- Upload a `.docx` file to parse and save video scripts to the database.
-
-#### 2. Prompt Generation
-- **POST** `/prompts/generate`
-- Generate AI storyboards/prompts for the extracted video scripts.
-
-#### 3. Image Generation
-- **POST** `/generation/images`
-- Trigger image generation from a specific prompt.
-
-#### 4. Video Generation
-- **POST** `/generation/video`
-- Generate a video using a start image (and optional end image).
-
-#### 5. Status Check
-- **GET** `/generation/status/{video_id}`
-- Check the progress of a background generation job.
-
-## Development
-
-- **Database Migrations**: Ensure your PostgreSQL database is running and accessible via `DATABASE_URL` before starting the app. The app attempts to create tables on startup (dev mode).
-- **Architecture**: The project follows a layered architecture: `Router -> Service -> Repository -> Database`.
-
-## Troubleshooting
-
-- **"ModuleNotFoundError"**: Ensure you are running the command from the root directory and your virtual environment is active.
-- **Database Connection**: Verify `DATABASE_URL` in `.env` matches your local PostgreSQL credentials.
+## 6. Current Data Flow Note
+*Observation:* There is currently a logical disconnect between **Stage A** and **Stage B**.
+-   **Stage A** produces a Storyboard but returns it to the client without saving it to a database table.
+-   **Stage B** attempts to load a Storyboard from the database to generate prompts.
+-   **Resolution Needed**: A temporary store or a `Storyboards` table should be introduced to persist the output of Stage A so Stage B can retrieve it.
