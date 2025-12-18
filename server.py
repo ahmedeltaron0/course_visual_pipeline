@@ -166,10 +166,11 @@ async def generate_file_prompts(file: UploadFile = File(...),
 @app.post("/generate_images_for_file")
 async def generate_images_for_file(file_id: uuid.UUID,
                                    video_number: Optional[int] = None,
+                                   num_of_shots: Optional[int] = None,
                                     higgs_service: HiggsService = Depends(get_higgs_service),
                                     ):
 
-    result = await higgs_service.generate_images_for_file(file_id=file_id, video_number=video_number)
+    result = await higgs_service.generate_images_for_file(file_id=file_id, video_number=video_number, num_of_shots=num_of_shots)
     return result
 
 @app.post("/generate_videos_from_images")

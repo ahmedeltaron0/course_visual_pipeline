@@ -57,7 +57,7 @@ class HiggsService:
             print("Error:", response.status_code, response.text)
         return response.json()
 
-    async def generate_images_for_file(self, file_id: str, video_number: Optional[int] = None):
+    async def generate_images_for_file(self, file_id: str, video_number: Optional[int] = None, num_of_shots: Optional[int] = None):
         # Get prompts from DB (still dict inside prompt field)
         prompts: List[AgentResponse] = await self.agent_repo.get_prompts_by_file_id(
             file_id=file_id,
@@ -65,12 +65,19 @@ class HiggsService:
         )
         
         higgs_prompts = []
+        shots_processed_count = 0
 
         for prompt in prompts:
             # Convert the dict into Pydantic StoryboardOutput
             storyboard: StoryboardOutput = StoryboardOutput.model_validate(prompt.prompt)
 
             for shot in storyboard.shots:
+                # Check if we reached the limit
+                if num_of_shots is not None and shots_processed_count >= num_of_shots:
+                    break
+                
+                shots_processed_count += 1
+
                 for frame in shot.frames:
                     # Convert frame_prompt to dict to send to Higgs
                     higgs_prompts.append(frame.frame_prompt.model_dump())
@@ -89,6 +96,10 @@ class HiggsService:
                                                     "response_body": higgs_req
                                                     })
                     await self.db.commit()
+            
+            # Break outer loop if limit reached
+            if num_of_shots is not None and shots_processed_count >= num_of_shots:
+                break
         
         print(higgs_prompts)
         return higgs_prompts
